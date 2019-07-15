@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 
-final FirebaseDatabase database = FirebaseDatabase.instance;
+import 'modal/modal.dart';
 
 void main() => runApp(MyApp());
 
@@ -14,31 +14,30 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      home: MyHomePage(title: 'Community Board'),
+      home: MyHomePage(),
     );
   }
 }
 
 class MyHomePage extends StatefulWidget {
-  MyHomePage({Key key, this.title}) : super(key: key);
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
   @override
   _MyHomePageState createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  //int _counter = 0;
+  List<Board> boardMessages = List();
+  Board board;
+  final FirebaseDatabase database = FirebaseDatabase.instance;
+  final GlobalKey<FormState> formKey = GlobalKey<FormState>();
+  DatabaseReference databaseReference;
+
+  @override
+  void initState() {
+    super.initState();
+    board = Board("", "");
+    databaseReference = database.reference().child("community_board");
+    databaseReference.onChildAdded.listen(_onEntryAdded);
+  } //int _counter = 0;
 
 //  void _incrementCounter() {
 //    database.reference().child('message').set({
@@ -68,14 +67,63 @@ class _MyHomePageState extends State<MyHomePage> {
       appBar: AppBar(
         // Here we take the value from the MyHomePage object that was created by
         // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
+        title: Text("Board"),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[],
-        ),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      body: Column(
+        children: <Widget>[
+          Flexible(
+            flex: 0,
+            child: Form(
+              key: formKey,
+              child: Flex(
+                direction: Axis.vertical,
+                children: <Widget>[
+                  ListTile(
+                    leading: Icon(Icons.subject),
+                    title: TextFormField(
+                      initialValue: "",
+                      onSaved: (val) => board.subject = val,
+                      validator: (val) => val == "" ? val : null
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.message),
+                    title: TextFormField(
+                      initialValue: "",
+                      onSaved: (val) => board.body = val,
+                      validator: (val) => val == "" ? val : null
+                    ),
+                  ),
+                  FlatButton(
+                    child: Text("Post"),
+                    color: Colors.redAccent,
+                    onPressed: (){
+                      handleSubmit();
+                    }
+                  )
+                ],
+              )
+            ),
+
+          )
+        ],
+      )// This trailing comma makes auto-formatting nicer for build methods.
     );
+  }
+
+  void _onEntryAdded(Event event) {
+    setState(() {
+      boardMessages.add(Board.fromSnapshot(event.snapshot));
+    });
+  }
+
+  void handleSubmit() {
+    final FormState form = formKey.currentState;
+    if(form.validate()){
+      form.save();
+      form.reset();
+      // save form data to the database
+      databaseReference.push().set(board.toJson());
+    }
   }
 }
